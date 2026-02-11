@@ -46,7 +46,7 @@
     }
     .vote-item {
       display: grid;
-      grid-template-columns: auto 1fr auto;
+      grid-template-columns: auto 1fr auto auto;
       gap: var(--space-lg);
       padding: var(--space);
       border-bottom: 1px solid var(--border);
@@ -70,6 +70,39 @@
       font-size: 0.875rem;
       color: var(--text-muted);
       white-space: nowrap;
+    }
+    .vote-ip {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--bg-soft);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+    }
+    .btn-reset {
+      margin-bottom: var(--space-lg);
+      margin-left: var(--space);
+      padding: 0.75rem var(--space-lg);
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    .btn-reset:hover {
+      background: #c0392b;
+    }
+    .admin-key-input {
+      margin-bottom: var(--space-lg);
+      padding: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: monospace;
+      width: 200px;
     }
     .empty-state {
       text-align: center;
@@ -99,7 +132,11 @@
 
     <div id="stats-container" class="stats-grid"></div>
 
-    <button class="btn-export" id="btn-export">Exporter les données (JSON)</button>
+    <div style="margin-bottom: var(--space-lg);">
+      <input type="password" id="admin-key-input" class="admin-key-input" placeholder="Clé admin" />
+      <button class="btn-export" id="btn-export">Exporter les données (JSON)</button>
+      <button class="btn-reset" id="btn-reset">Réinitialiser tous les votes</button>
+    </div>
 
     <section class="votes-list">
       <h2 style="margin-top: 0; margin-bottom: var(--space-lg);">Liste des votes</h2>
@@ -108,11 +145,13 @@
   </main>
   <script>
     (function () {
-      const API_URL = window.API_URL || 'https://sondage-api.onrender.com';
+      const API_URL = window.API_URL || 'http://localhost:3000';
 
       const statsContainer = document.getElementById('stats-container');
       const votesContainer = document.getElementById('votes-container');
       const btnExport = document.getElementById('btn-export');
+      const btnReset = document.getElementById('btn-reset');
+      const adminKeyInput = document.getElementById('admin-key-input');
 
       function getVotes() {
         return fetch(API_URL + '/api/votes')
@@ -168,9 +207,46 @@
           div.innerHTML =
             '<span class="vote-id">' + escapeHtml(vote.id.substr(0, 8)) + '…</span>' +
             '<span class="vote-choix">' + escapeHtml(vote.choix) + '</span>' +
+            '<span class="vote-ip">' + escapeHtml(vote.ip_address || 'unknown') + '</span>' +
             '<span class="vote-date">' + formatDate(vote.timestamp) + '</span>';
           votesContainer.appendChild(div);
         });
+      }
+
+      function resetVotes() {
+        var key = adminKeyInput.value.trim();
+        if (!key) {
+          alert('Veuillez entrer la clé admin');
+          return;
+        }
+        if (!confirm('Êtes-vous sûr de vouloir supprimer TOUS les votes ? Cette action est irréversible.')) {
+          return;
+        }
+        fetch(API_URL + '/api/votes?key=' + encodeURIComponent(key), {
+          method: 'DELETE'
+        })
+          .then(function (r) {
+            if (!r.ok) {
+              return r.json().then(function (data) {
+                throw new Error(data.error || 'Erreur ' + r.status);
+              });
+            }
+            return r.json();
+          })
+          .then(function (data) {
+            alert('Tous les votes ont été supprimés avec succès');
+            adminKeyInput.value = '';
+            getVotes().then(function (data) {
+              var votes = data.votes;
+              var counts = data.counts;
+              var total = Object.keys(counts).reduce(function (acc, k) { return acc + (counts[k] || 0); }, 0);
+              afficherStats(counts, total);
+              afficherVotes(votes);
+            });
+          })
+          .catch(function (err) {
+            alert('Erreur: ' + err.message);
+          });
       }
 
       btnExport.addEventListener('click', function () {
@@ -189,6 +265,8 @@
           URL.revokeObjectURL(url);
         });
       });
+
+      btnReset.addEventListener('click', resetVotes);
 
       getVotes().then(function (data) {
         var votes = data.votes;

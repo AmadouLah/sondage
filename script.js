@@ -56,13 +56,23 @@
 
   function getStats() {
     if (!API_URL) {
+      console.warn('API_URL non configurée');
       return Promise.resolve({});
     }
+    console.log('Chargement des stats depuis:', API_URL + '/api/stats');
     return fetch(API_URL + '/api/stats')
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-      .then(function (data) { return data.counts || {}; })
+      .then(function (r) {
+        if (!r.ok) {
+          throw new Error('HTTP ' + r.status);
+        }
+        return r.json();
+      })
+      .then(function (data) {
+        console.log('Stats chargées:', data);
+        return data.counts || {};
+      })
       .catch(function (err) {
-        console.warn('Impossible de charger les stats depuis l\'API:', err);
+        console.warn('Impossible de charger les stats depuis l\'API:', err.message);
         return {};
       });
   }
@@ -113,22 +123,31 @@
       return Promise.reject('Backend non configuré');
     }
     var voteId = getVoteId();
+    console.log('Envoi du vote à:', API_URL + '/api/vote');
     return fetch(API_URL + '/api/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ choix: choix, voteId: voteId })
     })
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.text().then(function (text) {
+            throw new Error('HTTP ' + r.status + ': ' + text);
+          });
+        }
+        return r.json();
+      })
       .then(function (data) {
+        console.log('Vote enregistré avec succès:', data);
         localStorage.setItem(STORAGE_VOTE, choix);
         afficherResultats(types, data.counts);
       })
       .catch(function (err) {
-        console.error('Erreur lors de l\'enregistrement:', err);
+        console.error('Erreur complète:', err);
         var isLocal = API_URL.includes('localhost') || API_URL.includes('127.0.0.1');
         var message = isLocal 
-          ? 'Erreur lors de l\'enregistrement du vote. Le backend est-il démarré sur le port 3000 ?'
-          : 'Erreur lors de l\'enregistrement du vote. Le backend est-il déployé ?';
+          ? 'Erreur: ' + err.message + '\n\nVérifiez que le backend est démarré:\ncd backend && npm start'
+          : 'Erreur lors de l\'enregistrement du vote. Le backend est-il déployé ?\n\n' + err.message;
         alert(message);
         throw err;
       });
