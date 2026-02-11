@@ -49,6 +49,11 @@ function getCounts() {
   });
 }
 
+function handleError(res, err, message) {
+  console.error(message, err);
+  res.status(500).json({ error: 'Erreur serveur' });
+}
+
 app.post('/api/vote', function (req, res) {
   var choix = req.body.choix;
   var voteId = req.body.voteId;
@@ -85,8 +90,7 @@ app.post('/api/vote', function (req, res) {
       res.json({ success: true, voteId: voteId, counts: counts });
     })
     .catch(function (err) {
-      console.error('Erreur lors de l\'enregistrement:', err);
-      res.status(500).json({ error: 'Erreur serveur' });
+      handleError(res, err, 'Erreur lors de l\'enregistrement:');
     });
 });
 
@@ -96,8 +100,7 @@ app.get('/api/stats', function (req, res) {
       res.json({ counts: counts });
     })
     .catch(function (err) {
-      console.error('Erreur lors de la lecture:', err);
-      res.status(500).json({ error: 'Erreur serveur' });
+      handleError(res, err, 'Erreur lors de la lecture:');
     });
 });
 
@@ -117,13 +120,12 @@ app.get('/api/votes', function (req, res) {
       res.json({ votes: votes, counts: results[1] });
     })
     .catch(function (err) {
-      console.error('Erreur lors de la lecture:', err);
-      res.status(500).json({ error: 'Erreur serveur' });
+      handleError(res, err, 'Erreur lors de la lecture:');
     });
 });
 
 initDatabase().then(function () {
-  app.listen(PORT, function () {
+  app.listen(PORT, '0.0.0.0', function () {
     console.log('Serveur démarré sur le port', PORT);
   });
 });
