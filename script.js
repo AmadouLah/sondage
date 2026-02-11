@@ -1,7 +1,7 @@
 (function () {
   const STORAGE_VOTE = 'sondage-vote';
   const STORAGE_VOTE_ID = 'sondage-vote-id';
-  const API_URL = window.API_URL || 'https://sondage-api.onrender.com';
+  const API_URL = window.API_URL || 'http://localhost:3000';
   const TYPES_FALLBACK = ['Écrit', 'Oral', 'QCM', 'Projet', 'Pratique'];
 
   const form = document.getElementById('form-sondage');
@@ -55,10 +55,16 @@
   }
 
   function getStats() {
+    if (!API_URL || API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
+      return Promise.resolve({});
+    }
     return fetch(API_URL + '/api/stats')
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
       .then(function (data) { return data.counts || {}; })
-      .catch(function () { return {}; });
+      .catch(function (err) {
+        console.warn('Impossible de charger les stats depuis l\'API:', err);
+        return {};
+      });
   }
 
   function getVoteId() {
@@ -102,6 +108,10 @@
   }
 
   function enregistrerVote(choix, types) {
+    if (!API_URL || API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
+      alert('Le backend n\'est pas configuré. Veuillez configurer API_URL dans config.js');
+      return Promise.reject('Backend non configuré');
+    }
     var voteId = getVoteId();
     return fetch(API_URL + '/api/vote', {
       method: 'POST',
@@ -115,7 +125,8 @@
       })
       .catch(function (err) {
         console.error('Erreur lors de l\'enregistrement:', err);
-        alert('Erreur lors de l\'enregistrement du vote. Veuillez réessayer.');
+        alert('Erreur lors de l\'enregistrement du vote. Le backend est-il déployé ?');
+        throw err;
       });
   }
 
@@ -140,6 +151,17 @@
     renderChoix(types);
     getStats().then(function (counts) {
       afficherResultats(types, counts);
+    }).catch(function (err) {
+      console.error('Erreur lors du chargement des stats:', err);
+      afficherResultats(types, {});
+    });
+  }).catch(function (err) {
+    console.error('Erreur lors du chargement des types:', err);
+    renderChoix(TYPES_FALLBACK);
+    getStats().then(function (counts) {
+      afficherResultats(TYPES_FALLBACK, counts);
+    }).catch(function () {
+      afficherResultats(TYPES_FALLBACK, {});
     });
   });
 })();

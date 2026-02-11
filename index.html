@@ -16,10 +16,18 @@
     <p class="intro">Choisissez le type d'examen que vous souhaitez.</p>
     <a href="admin.html" style="position: fixed; bottom: 1rem; right: 1rem; font-size: 0.75rem; color: var(--text-muted); text-decoration: none; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">Admin</a>
 
+    <noscript>
+      <p style="color: var(--text-muted); padding: var(--space-lg); background: var(--surface); border-radius: var(--radius);">
+        JavaScript doit être activé pour utiliser ce sondage.
+      </p>
+    </noscript>
+
     <form id="form-sondage" class="form-sondage" aria-label="Formulaire de vote">
       <fieldset id="fieldset-choix">
         <legend>Votre choix</legend>
-        <div id="choix-container" class="choix-container"></div>
+        <div id="choix-container" class="choix-container">
+          <p style="color: var(--text-muted);">Chargement des options...</p>
+        </div>
         <button type="submit" id="btn-submit" class="btn-submit">Envoyer mon vote</button>
       </fieldset>
     </form>
