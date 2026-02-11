@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sondage – Type d'examen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <main class="sondage">
+    <h1>Sondage : type d'examen préféré</h1>
+    <p class="intro">Choisissez le type d'examen que vous souhaitez.</p>
+    <a href="admin.html" style="position: fixed; bottom: 1rem; right: 1rem; font-size: 0.75rem; color: var(--text-muted); text-decoration: none; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">Admin</a>
+
+    <form id="form-sondage" class="form-sondage" aria-label="Formulaire de vote">
+      <fieldset id="fieldset-choix">
+        <legend>Votre choix</legend>
+        <div id="choix-container" class="choix-container"></div>
+        <button type="submit" id="btn-submit" class="btn-submit">Envoyer mon vote</button>
+      </fieldset>
+    </form>
+
+    <section id="resultats" class="resultats" aria-live="polite" hidden>
+      <h2>Résultats</h2>
+      <p id="message-vote" class="message-vote"></p>
+      <ul id="liste-resultats" class="liste-resultats"></ul>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
