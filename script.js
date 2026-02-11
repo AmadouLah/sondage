@@ -55,7 +55,7 @@
   }
 
   function getStats() {
-    if (!API_URL || API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
+    if (!API_URL) {
       return Promise.resolve({});
     }
     return fetch(API_URL + '/api/stats')
@@ -108,7 +108,7 @@
   }
 
   function enregistrerVote(choix, types) {
-    if (!API_URL || API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
+    if (!API_URL) {
       alert('Le backend n\'est pas configuré. Veuillez configurer API_URL dans config.js');
       return Promise.reject('Backend non configuré');
     }
@@ -125,7 +125,11 @@
       })
       .catch(function (err) {
         console.error('Erreur lors de l\'enregistrement:', err);
-        alert('Erreur lors de l\'enregistrement du vote. Le backend est-il déployé ?');
+        var isLocal = API_URL.includes('localhost') || API_URL.includes('127.0.0.1');
+        var message = isLocal 
+          ? 'Erreur lors de l\'enregistrement du vote. Le backend est-il démarré sur le port 3000 ?'
+          : 'Erreur lors de l\'enregistrement du vote. Le backend est-il déployé ?';
+        alert(message);
         throw err;
       });
   }

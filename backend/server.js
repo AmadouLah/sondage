@@ -17,6 +17,25 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
+app.get('/api/health', function (req, res) {
+  pool.query('SELECT NOW() as time, COUNT(*) as votes_count FROM votes')
+    .then(function (result) {
+      res.json({
+        status: 'ok',
+        database: 'connected',
+        time: result.rows[0].time,
+        votesCount: parseInt(result.rows[0].votes_count, 10)
+      });
+    })
+    .catch(function (err) {
+      res.status(500).json({
+        status: 'error',
+        database: 'disconnected',
+        error: err.message
+      });
+    });
+});
+
 function initDatabase() {
   return pool.query(`
     CREATE TABLE IF NOT EXISTS votes (
@@ -125,7 +144,17 @@ app.get('/api/votes', function (req, res) {
 });
 
 initDatabase().then(function () {
+  pool.query('SELECT NOW()')
+    .then(function () {
+      console.log('✅ Connexion à la base de données NeonDB réussie');
+    })
+    .catch(function (err) {
+      console.error('❌ Erreur de connexion à la base de données:', err.message);
+      console.error('Vérifiez que DATABASE_URL est correctement configuré');
+    });
+  
   app.listen(PORT, '0.0.0.0', function () {
-    console.log('Serveur démarré sur le port', PORT);
+    console.log('🚀 Serveur démarré sur le port', PORT);
+    console.log('📊 Base de données:', process.env.DATABASE_URL ? 'Configurée' : '⚠️  Non configurée');
   });
 });
