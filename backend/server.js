@@ -59,6 +59,40 @@ function getClientIp(req) {
          'unknown';
 }
 
+function columnExists(columnName) {
+  return pool.query(`
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name='votes' AND column_name=$1
+  `, [columnName])
+    .then(function (result) {
+      return result.rows.length > 0;
+    })
+    .catch(function () {
+      return false;
+    });
+}
+
+function migrateDatabase() {
+  return columnExists('ip_address')
+    .then(function (exists) {
+      if (!exists) {
+        console.log('Migration: Ajout de la colonne ip_address...');
+        return pool.query('ALTER TABLE votes ADD COLUMN ip_address VARCHAR(45)')
+          .then(function () {
+            return pool.query('CREATE INDEX IF NOT EXISTS idx_votes_ip ON votes(ip_address)');
+          })
+          .then(function () {
+            console.log('✅ Migration réussie: colonne ip_address ajoutée');
+          });
+      }
+      return Promise.resolve();
+    })
+    .catch(function (err) {
+      console.error('Erreur lors de la migration:', err);
+    });
+}
+
 function initDatabase() {
   return pool.query(`
     CREATE TABLE IF NOT EXISTS votes (
@@ -70,9 +104,13 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_votes_choix ON votes(choix);
     CREATE INDEX IF NOT EXISTS idx_votes_timestamp ON votes(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_votes_ip ON votes(ip_address);
-  `).catch(function (err) {
-    console.error('Erreur lors de l\'initialisation de la base:', err);
-  });
+  `)
+    .then(function () {
+      return migrateDatabase();
+    })
+    .catch(function (err) {
+      console.error('Erreur lors de l\'initialisation de la base:', err);
+    });
 }
 
 function generateId() {
@@ -108,25 +146,30 @@ app.post('/api/vote', function (req, res) {
   }
 
   if (!voteId) {
-    voteId = generateId();
+    return res.status(400).json({ error: 'VoteId requis' });
   }
 
-  pool.query('SELECT choix FROM votes WHERE id = $1', [voteId])
-    .then(function (result) {
-      var ancienVote = result.rows.length > 0 ? result.rows[0].choix : null;
-      var timestamp = Date.now();
-
-      if (ancienVote) {
-        return pool.query(
-          'UPDATE votes SET choix = $1, timestamp = $2, ip_address = $4 WHERE id = $3',
-          [choix, timestamp, voteId, ipAddress]
-        );
-      } else {
-        return pool.query(
-          'INSERT INTO votes (id, choix, timestamp, ip_address) VALUES ($1, $2, $3, $4)',
-          [voteId, choix, timestamp, ipAddress]
-        );
-      }
+  columnExists('ip_address')
+    .then(function (hasIpColumn) {
+      return pool.query('SELECT id FROM votes WHERE id = $1', [voteId])
+        .then(function (result) {
+          if (result.rows.length > 0) {
+            return Promise.reject({ code: 'ALREADY_VOTED', message: 'Vous avez déjà voté' });
+          }
+          
+          var timestamp = Date.now();
+          if (hasIpColumn) {
+            return pool.query(
+              'INSERT INTO votes (id, choix, timestamp, ip_address) VALUES ($1, $2, $3, $4)',
+              [voteId, choix, timestamp, ipAddress]
+            );
+          } else {
+            return pool.query(
+              'INSERT INTO votes (id, choix, timestamp) VALUES ($1, $2, $3)',
+              [voteId, choix, timestamp]
+            );
+          }
+        });
     })
     .then(function () {
       return getCounts();
@@ -135,6 +178,9 @@ app.post('/api/vote', function (req, res) {
       res.json({ success: true, voteId: voteId, counts: counts });
     })
     .catch(function (err) {
+      if (err.code === 'ALREADY_VOTED') {
+        return res.status(403).json({ error: err.message });
+      }
       handleError(res, err, 'Erreur lors de l\'enregistrement:');
     });
 });
@@ -150,10 +196,17 @@ app.get('/api/stats', function (req, res) {
 });
 
 app.get('/api/votes', function (req, res) {
-  Promise.all([
-    pool.query('SELECT id, choix, timestamp, ip_address FROM votes ORDER BY timestamp DESC'),
-    getCounts()
-  ])
+  columnExists('ip_address')
+    .then(function (hasIpColumn) {
+      var query = hasIpColumn 
+        ? 'SELECT id, choix, timestamp, ip_address FROM votes ORDER BY timestamp DESC'
+        : 'SELECT id, choix, timestamp FROM votes ORDER BY timestamp DESC';
+      
+      return Promise.all([
+        pool.query(query),
+        getCounts()
+      ]);
+    })
     .then(function (results) {
       var votes = results[0].rows.map(function (row) {
         return {

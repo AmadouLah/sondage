@@ -90,6 +90,22 @@
     }
   }
 
+  function checkVoteStatus() {
+    if (!API_URL) {
+      return Promise.resolve(false);
+    }
+    var voteId = getVoteId();
+    return fetch(API_URL + '/api/votes')
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (data) {
+        var votes = data.votes || [];
+        return votes.some(function (v) { return v.id === voteId; });
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
   function afficherResultats(types, counts) {
     var total = getTotal(counts);
     var voted = localStorage.getItem(STORAGE_VOTE);
@@ -131,8 +147,11 @@
     })
       .then(function (r) {
         if (!r.ok) {
-          return r.text().then(function (text) {
-            throw new Error('HTTP ' + r.status + ': ' + text);
+          return r.json().then(function (data) {
+            if (r.status === 403 && data.error) {
+              throw new Error(data.error);
+            }
+            throw new Error('HTTP ' + r.status + ': ' + (data.error || 'Erreur'));
           });
         }
         return r.json();
@@ -141,16 +160,29 @@
         console.log('Vote enregistré avec succès:', data);
         localStorage.setItem(STORAGE_VOTE, choix);
         afficherResultats(types, data.counts);
+        desactiverFormulaire();
       })
       .catch(function (err) {
         console.error('Erreur complète:', err);
-        var isLocal = API_URL.includes('localhost') || API_URL.includes('127.0.0.1');
-        var message = isLocal 
-          ? 'Erreur: ' + err.message + '\n\nVérifiez que le backend est démarré:\ncd backend && npm start'
-          : 'Erreur lors de l\'enregistrement du vote. Le backend est-il déployé ?\n\n' + err.message;
+        var message = err.message || 'Erreur lors de l\'enregistrement';
+        if (err.message && err.message.includes('déjà voté')) {
+          desactiverFormulaire();
+        }
         alert(message);
         throw err;
       });
+  }
+
+  function desactiverFormulaire() {
+    form.querySelectorAll('input[type="radio"]').forEach(function (input) {
+      input.disabled = true;
+    });
+    var btn = form.querySelector('.btn-submit');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Vous avez déjà voté';
+    }
+    form.closest('.sondage').setAttribute('data-voted', 'true');
   }
 
   form.addEventListener('submit', function (e) {
@@ -170,21 +202,38 @@
     });
   });
 
-  getTypes().then(function (types) {
-    renderChoix(types);
-    getStats().then(function (counts) {
+  function initialiserPage() {
+    getTypes().then(function (types) {
+      renderChoix(types);
+      return Promise.all([
+        getStats(),
+        checkVoteStatus()
+      ]);
+    }).then(function (results) {
+      var counts = results[0];
+      var hasVoted = results[1];
+      var types = Array.from(document.querySelectorAll('#choix-container input[value]')).map(function (i) { return i.value; });
+      if (types.length === 0) {
+        types = TYPES_FALLBACK;
+      }
       afficherResultats(types, counts);
+      if (hasVoted) {
+        desactiverFormulaire();
+        var storedVote = localStorage.getItem(STORAGE_VOTE);
+        if (storedVote) {
+          messageVote.textContent = 'Vous avez déjà voté. Merci !';
+        }
+      }
     }).catch(function (err) {
-      console.error('Erreur lors du chargement des stats:', err);
-      afficherResultats(types, {});
+      console.error('Erreur lors de l\'initialisation:', err);
+      renderChoix(TYPES_FALLBACK);
+      getStats().then(function (counts) {
+        afficherResultats(TYPES_FALLBACK, counts);
+      }).catch(function () {
+        afficherResultats(TYPES_FALLBACK, {});
+      });
     });
-  }).catch(function (err) {
-    console.error('Erreur lors du chargement des types:', err);
-    renderChoix(TYPES_FALLBACK);
-    getStats().then(function (counts) {
-      afficherResultats(TYPES_FALLBACK, counts);
-    }).catch(function () {
-      afficherResultats(TYPES_FALLBACK, {});
-    });
-  });
+  }
+
+  initialiserPage();
 })();
