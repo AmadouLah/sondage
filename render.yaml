@@ -2,12 +2,9 @@ services:
   - type: web
     name: sondage-api
     plan: free
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && npm start
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      # IMPORTANT: Configurez DATABASE_URL dans le dashboard Render après création
-      # Settings > Environment > Add Environment Variable
-      # Clé: DATABASE_URL
-      # Valeur: postgresql://neondb_owner:npg_elQ0OghfjWm1@ep-weathered-salad-aijfi77x-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
