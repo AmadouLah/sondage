@@ -185,6 +185,19 @@
     form.closest('.sondage').setAttribute('data-voted', 'true');
   }
 
+  function reactiverFormulaire() {
+    form.querySelectorAll('input[type="radio"]').forEach(function (input) {
+      input.disabled = false;
+    });
+    var btn = form.querySelector('.btn-submit');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Envoyer mon vote';
+    }
+    form.closest('.sondage').setAttribute('data-voted', '');
+    localStorage.removeItem(STORAGE_VOTE);
+  }
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var selected = document.querySelector('input[name="type-examen"]:checked');
@@ -217,11 +230,15 @@
         types = TYPES_FALLBACK;
       }
       afficherResultats(types, counts);
+      
       if (hasVoted) {
         desactiverFormulaire();
+        messageVote.textContent = 'Vous avez déjà voté. Merci !';
+      } else {
+        reactiverFormulaire();
         var storedVote = localStorage.getItem(STORAGE_VOTE);
         if (storedVote) {
-          messageVote.textContent = 'Vous avez déjà voté. Merci !';
+          messageVote.textContent = 'Vous pouvez voter à nouveau.';
         }
       }
     }).catch(function (err) {
@@ -234,6 +251,23 @@
       });
     });
   }
+
+  setInterval(function() {
+    if (!API_URL) return;
+    checkVoteStatus().then(function(hasVoted) {
+      var isDisabled = form.querySelector('.btn-submit')?.disabled;
+      if (!hasVoted && isDisabled) {
+        reactiverFormulaire();
+        var types = Array.from(document.querySelectorAll('#choix-container input[value]')).map(function (i) { return i.value; });
+        if (types.length === 0) {
+          types = TYPES_FALLBACK;
+        }
+        getStats().then(function(counts) {
+          afficherResultats(types, counts);
+        });
+      }
+    }).catch(function() {});
+  }, 5000);
 
   initialiserPage();
 })();
