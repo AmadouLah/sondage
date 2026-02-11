@@ -1,6 +1,7 @@
 services:
   - type: web
     name: sondage-api
+    runtime: node
     plan: free
     rootDir: backend
     buildCommand: npm install
